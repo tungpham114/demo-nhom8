@@ -1,0 +1,105 @@
+CREATE DATABASE IF NOT EXISTS TOURBUSINESSPROPOSAL8 CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE TOURBUSINESSPROPOSAL8;
+
+CREATE TABLE IF NOT EXISTS users (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ name VARCHAR(160) NOT NULL, email VARCHAR(190) NOT NULL UNIQUE,
+ password_hash VARCHAR(255) NOT NULL, role ENUM('customer','seller','admin') NOT NULL,
+ created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS sellers (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ user_id BIGINT UNSIGNED NOT NULL UNIQUE, company_name VARCHAR(190) NOT NULL,
+ tax_code VARCHAR(30) NOT NULL UNIQUE, address VARCHAR(255) NOT NULL,
+ representative VARCHAR(160) NOT NULL, phone VARCHAR(25) NOT NULL,
+ travel_type ENUM('domestic','international') NOT NULL,
+ business_license VARCHAR(255) NOT NULL, travel_license VARCHAR(255) NOT NULL,
+ status ENUM('pending','verified','rejected') NOT NULL DEFAULT 'pending',
+ rejection_reason TEXT NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS tours (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ seller_id BIGINT UNSIGNED NOT NULL, title VARCHAR(255) NOT NULL,
+ destination VARCHAR(120) NOT NULL, origin VARCHAR(120) NOT NULL,
+ days TINYINT UNSIGNED NOT NULL, nights TINYINT UNSIGNED NOT NULL,
+ description TEXT NOT NULL, itinerary TEXT NOT NULL,
+ included TEXT NOT NULL, excluded TEXT NOT NULL, pickup VARCHAR(255) NOT NULL,
+ transport VARCHAR(100) NOT NULL, accommodation VARCHAR(180) NOT NULL,
+ required_documents VARCHAR(255) NOT NULL DEFAULT '',
+ cancellation_policy VARCHAR(100) NOT NULL,
+ is_international TINYINT(1) NOT NULL DEFAULT 0,
+ base_price INT UNSIGNED NOT NULL, surcharge_per_person INT UNSIGNED NOT NULL DEFAULT 0,
+ surcharge_label VARCHAR(120) NOT NULL DEFAULT 'Phụ thu bắt buộc',
+ image_path VARCHAR(255) NOT NULL,
+ status ENUM('draft','pending','approved','rejected','paused') NOT NULL DEFAULT 'draft',
+ pending_payload JSON NULL, rejection_reason TEXT NULL,
+ created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ FOREIGN KEY (seller_id) REFERENCES sellers(id), INDEX (status,destination)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS departures (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ tour_id BIGINT UNSIGNED NOT NULL, start_date DATE NOT NULL, end_date DATE NOT NULL,
+ capacity SMALLINT UNSIGNED NOT NULL, price_per_person INT UNSIGNED NOT NULL,
+ cutoff_at DATETIME NOT NULL,
+ meeting_time VARCHAR(80) NOT NULL DEFAULT '',
+ status ENUM('open','closed','cancelled') NOT NULL DEFAULT 'open',
+ created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ FOREIGN KEY (tour_id) REFERENCES tours(id), INDEX (tour_id,start_date)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS bookings (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, code VARCHAR(24) NOT NULL UNIQUE,
+ departure_id BIGINT UNSIGNED NOT NULL, customer_id BIGINT UNSIGNED NOT NULL,
+ people SMALLINT UNSIGNED NOT NULL, contact_name VARCHAR(160) NOT NULL,
+ contact_phone VARCHAR(25) NOT NULL, contact_email VARCHAR(190) NOT NULL,
+ note TEXT NULL, base_unit INT UNSIGNED NOT NULL, surcharge_unit INT UNSIGNED NOT NULL,
+ surcharge_label VARCHAR(120) NOT NULL, total INT UNSIGNED NOT NULL,
+ paid_amount INT UNSIGNED NOT NULL DEFAULT 0,
+ policy_snapshot VARCHAR(100) NOT NULL,
+ status ENUM('pending_seller','confirmed','deposited','paid','completed','rejected','expired','cancelled') NOT NULL DEFAULT 'pending_seller',
+ seller_deadline DATETIME NOT NULL, deposit_deadline DATETIME NULL,
+ balance_deadline DATETIME NOT NULL, full_required TINYINT(1) NOT NULL DEFAULT 0,
+ confirmed_at DATETIME NULL, cancellation_reason TEXT NULL,
+ created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ FOREIGN KEY (departure_id) REFERENCES departures(id),
+ FOREIGN KEY (customer_id) REFERENCES users(id),
+ INDEX (departure_id,status), INDEX (customer_id,created_at)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS passengers (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ booking_id BIGINT UNSIGNED NOT NULL, full_name VARCHAR(160) NOT NULL,
+ gender ENUM('female','male','other') NOT NULL, date_of_birth DATE NOT NULL,
+ phone VARCHAR(25) NOT NULL, passport_number VARCHAR(40) NULL,
+ passport_expiry DATE NULL, nationality VARCHAR(80) NULL,
+ FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS payments (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ booking_id BIGINT UNSIGNED NOT NULL, reference VARCHAR(48) NOT NULL UNIQUE,
+ amount INT UNSIGNED NOT NULL, status ENUM('success','failed') NOT NULL,
+ method VARCHAR(50) NOT NULL DEFAULT 'LOCAL_DEMO',
+ created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ FOREIGN KEY (booking_id) REFERENCES bookings(id)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS audit_log (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ actor_id BIGINT UNSIGNED NULL, object_type VARCHAR(35) NOT NULL,
+ object_id BIGINT UNSIGNED NOT NULL, action VARCHAR(70) NOT NULL,
+ detail TEXT NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ FOREIGN KEY (actor_id) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS notifications (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ user_id BIGINT UNSIGNED NOT NULL, message VARCHAR(500) NOT NULL,
+ created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ FOREIGN KEY (user_id) REFERENCES users(id), INDEX(user_id,created_at)
+) ENGINE=InnoDB;
